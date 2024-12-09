@@ -48,6 +48,7 @@ df = df.drop("Timestamp",axis=1)
 age_order = ["Less than 20","21 to 35","36 to 50", "51 or more"]
 encoder = OrdinalEncoder(categories=[age_order]) 
 df['AGE'] = encoder.fit_transform(df[['AGE']])
+df['AGE'] = df['AGE'] + 1
 #visualizing transformed age column 
 sns.countplot(x='AGE', data=df)
 plt.title('Age Categories')
@@ -77,8 +78,8 @@ plt.show()
 #general questions worth investigating:
 # 1. what are the correlations between the  reported lifestyle factors and wellbeing scores? 
 # 2. can we predict work-life-balance-scores based on lifestyle factors using a predictive model?
-# 3. are there any significant differences in wellbeing scores across different groups?
-# 4. can we predict work-life-balance scores based on age or gender?
+# 3. are there any significant differences in wellbeing scores based on age or gender? 
+# can differences for the most important lifestyle factors based on gender be found?
 
 #computing correlation matrix to explore first research question
 correlation_matrix = df.corr()
@@ -296,23 +297,6 @@ for result_gender in results_gender:
     print(f"Variable: {result_gender['Variable']}, Original P-Value: {result_gender['P-Value']:.2e}, Bonferroni-Adjusted P-Value: {result_gender['Bonferroni_P-Value']:.2e}")
 
 #adjusted p-values for work_life_balance score, supporting others, todo completed and daily stress remain significant (< 0.05)
-#regression analysis to check for predictive power of gender
-
-df['GENDER_dummy'] = df['GENDER_Male'].apply(lambda x: 1 if x == True else 0)
-dependent_variables= ['WORK_LIFE_BALANCE_SCORE', 'SUPPORTING_OTHERS', 'TODO_COMPLETED', 'DAILY_STRESS']
-results_gender_prediction= []
-for var_dependent in dependent_variables: 
-    X= df[["GENDER_dummy"]]
-    X = sm.add_constant(X)
-    y= df[var_dependent]
-    model_gender = sm.OLS(y,X).fit()
-    results_gender_prediction.append({'Dependent Variable':var_dependent, 'Coef': model_gender.params['GENDER_dummy'], 
-                                 'P-Value': model_gender.pvalues['GENDER_dummy']})
-    
-for result_gender_prediction in results_gender_prediction: 
-    print (f"Variable: {result_gender_prediction['Dependent Variable']}, Coefficient: {result_gender_prediction['Coef']:.4f},P-Value: {result_gender_prediction['P-Value']:.4e}")
-
-#significant effect of gender can be observed with a predictive nature
 
 #investigating effect of age on work-life-balance-score
 # since no normality was found ANOVA cannot be used
@@ -324,58 +308,19 @@ print(f'Kruskal-Wallis test: statistic = {stat}, p-value = {p_value}')
 posthoc = sp.posthoc_dunn(df, val_col='WORK_LIFE_BALANCE_SCORE', group_col='AGE', p_adjust='bonferroni')
 print(posthoc)
 #significant wellbeing score differences across  when comparing groups 1&2, 1&4, 2&3
+#looking at mean scores
 
-#principal component analysis
-scaler = StandardScaler()
-df_scaled = scaler.fit_transform(df)
-pca = PCA(n_components=4)
-pca_result = pca.fit_transform(df)
-print(pca_result)
-print(pca.explained_variance_ratio_)
+age_group_means = df.groupby("AGE")["WORK_LIFE_BALANCE_SCORE"].mean()
+print(age_group_means)
+#age category 1 reports higher scores than group 2, but lower than the oldest age group 
+# age category 3 has significantly higher wellbeing scores
 
-plt.figure(figsize=(8, 6))
-plt.plot(range(1, len(pca.explained_variance_ratio_) + 1), pca.explained_variance_ratio_, marker='o')
-plt.xlabel('Number of Components')
-plt.ylabel('Explained Variance Ratio')
-plt.title('Scree Plot')
-plt.show() 
-
-cum_variance = pca.explained_variance_ratio_.cumsum()
-print("Cumulative Explained Variance:", cum_variance)
-
-plt.plot(range(1, len(cum_variance) + 1), cum_variance, marker='o')
-plt.xlabel("Number of Components")
-plt.ylabel("Cumulative Explained Variance")
-plt.title("Explained Variance by Principal Components")
-plt.grid()
-plt.show()
-
-pca.components_ 
-#visualizing via biplot
-def biplot(pca, df_scaled):
-    pca_scores = pca.transform(df_scaled)
-    loadings  = pca.components_.T
-    plt.figure(figsize=(8, 6))
-    plt.scatter(pca_scores[:, 0], pca_scores[:, 1], alpha=0.7, edgecolors='r', s=50)
-    
-    for i in range(loadings.shape[0]):
-        plt.arrow(0, 0, loadings[i, 0] * max(pca_scores[:, 0]), 
-                  loadings[i, 1] * max(pca_scores[:, 1]), 
-                  color='r', alpha=0.5, width=0.005, head_width=0.1)
-        plt.text(loadings[i, 0] * max(pca_scores[:, 0]) * 1.1,
-                 loadings[i, 1] * max(pca_scores[:, 1]) * 1.1,
-                 df.columns[i], color='r', ha='center', va='center', fontsize=12)
-        
-    plt.xlabel(f"PC1 - {pca.explained_variance_ratio_[0] * 100:.2f}%")
-    plt.ylabel(f"PC2 - {pca.explained_variance_ratio_[1] * 100:.2f}%")
-    plt.title("PCA Biplot")
-    plt.grid(True)
-    plt.show()
-    
-biplot(pca, df_scaled)
-
-
-#first PC already explains 95% of variance, suggesting a strong underlying trend, 
-#returns are diminishing wenn more components are addded
-#biplot suggests 
+#conclusion:
+#supporting others and todo completed seem to have the biggest positive effect on wellbeing scores
+#daily stress has the biggest negative effect
+#we can predict well-being scores based on these factors to a certain extent (63% of variance explained)
+#significant group differences across genders found for work-life-balance-score, supporting others, todo completed and daily stress
+# no significant group difference across gender regarding achievement 
+#significant wellbeing score differences across  when comparing groups 1&2, 1&4, 2&3
+# it seems that the oldest employees experience the highest work-life-balance
 
